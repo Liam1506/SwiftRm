@@ -21,24 +21,6 @@ extension SwiftRmSession {
         
         let rootHash = try await getRootHash(userToken: userToken)
         
-        print("Root Hash: \(rootHash)")
-        
-       /* let index = try await fetchIndex(hash: rootHash, userToken: userToken)
-         
-         // each entry in index → another plain text index per document
-         // that sub-index contains the .metadata file hash
-         for entry in index {
-             let docIndex = try await fetchIndex(hash: entry.hash, userToken: userToken)
-             print("Document Index: \(docIndex)")
-             for file in docIndex {
-                 print("File: \(file)")
-                 if file.filename.hasSuffix(".metadata") {
-                     // NOW this is safe to decode as JSON
-                     let metadata = try await fetchMetadata(hash: file.hash, userToken: userToken)
-                     print("Item: \(metadata.visibleName) isFolder: \(metadata.isFolder)")
-                 }
-             }
-         }*/
         return SwiftRmSession (
             fetchMetadata: { hash in
                 let metaData = try await fetchMetadata(hash: hash, userToken: userToken)

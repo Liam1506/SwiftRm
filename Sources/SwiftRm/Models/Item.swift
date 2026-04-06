@@ -32,7 +32,7 @@ public struct RmItem: Codable, Sendable {
 }
 
 @Observable
-public class RmDocument {
+public class RmDocument: Identifiable {
     public let hash: String
     public let visibleName: String
     public let parent: String?
@@ -47,7 +47,14 @@ public class RmDocument {
 }
 
 @Observable
-public class RmFolder {
+public class RmFolder: Identifiable, Equatable, Hashable {
+    public static func == (lhs: RmFolder, rhs: RmFolder) -> Bool {
+        lhs.hash == rhs.hash
+    }
+    public func hash(into hasher: inout Hasher) {
+            hasher.combine(id)
+    }
+    
     public let hash: String
     public let visibleName: String
     public let parent: String?

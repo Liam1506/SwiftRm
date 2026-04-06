@@ -13,6 +13,7 @@ import Foundation
 public class SwiftRmFileSystem{
     public let session: SwiftRmSession
     public var items: [RmItem] = []
+    public let root =  RmFolder(hash: "", visibleName: "Root", parent: nil)
     
     init(session: SwiftRmSession) throws{
         self.session = session
@@ -31,7 +32,6 @@ public class SwiftRmFileSystem{
     }
     
     public func buildTree() async throws {
-        let root = RmFolder(hash: "", visibleName: "Root", parent: nil)
         var folderMap: [String: RmFolder] = ["": root]
         
         // Create all folders
