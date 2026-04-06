@@ -53,7 +53,7 @@ public class RmFolder: Identifiable, Equatable, Hashable {
     }
     public func hash(into hasher: inout Hasher) {
             hasher.combine(id)
-    }
+        }
     
     public let hash: String
     public let visibleName: String
