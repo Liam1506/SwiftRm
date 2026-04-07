@@ -21,13 +21,14 @@ public class SwiftRm {
         let session = try await SwiftRmSession.connect()
     }
 }
-// The main interface — a simple struct holding closures
+
 public struct SwiftRmSession {
     public var fetchMetadata: (String) async throws -> RmItem
     public var fetchIndex: (String) async throws -> [RmIndexEntry]
     public var deleteSomething: (String) async throws -> Void
     public var getRootHash: () async throws -> String
     public var loadItems: () async throws -> [RmItem]
+    public var fetchItem: (RmIndexEntry) async throws -> RmItem?
     
     public init(
         fetchMetadata: @escaping (String) async throws -> RmItem,//[Item],
@@ -35,6 +36,7 @@ public struct SwiftRmSession {
         deleteSomething: @escaping (String) async throws -> Void,
         getRootHash: @escaping () async throws -> String,
         loadItems: @escaping () async throws -> [RmItem],
+        fetchItem: @escaping (RmIndexEntry) async throws -> RmItem?,
         
     ) {
         self.fetchMetadata = fetchMetadata
@@ -42,6 +44,7 @@ public struct SwiftRmSession {
         self.deleteSomething = deleteSomething
         self.getRootHash = getRootHash
         self.loadItems = loadItems
+        self.fetchItem = fetchItem
     }
 }
 

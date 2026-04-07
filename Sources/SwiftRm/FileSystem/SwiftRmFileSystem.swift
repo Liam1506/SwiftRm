@@ -27,7 +27,7 @@ public class SwiftRmFileSystem{
     }
     
     public func loadFiles() async throws {
-        self.items = try await session.loadItems()
+        self.items = try await SwiftRmCache(session: session).loadItems()//session.loadItems()
     
         try await buildTree()
     }
@@ -45,7 +45,6 @@ public class SwiftRmFileSystem{
         }
         
         for item in items where item.isDocument {
-            print("Visible name: \(item.visibleName), hash  \(item.hash) parent  \(item.parent)")
             let doc = RmDocument(hash: item.hash ?? "", visibleName: item.visibleName, parent: item.parent, lastModified: item.lastModified)
             let parentFolder = folderMap[item.parent ?? ""] ?? root
             parentFolder.documents.append(doc)

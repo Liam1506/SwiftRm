@@ -12,12 +12,7 @@ extension SwiftRmSession {
     
     
     public static func connect() async throws-> SwiftRmSession {
-        guard let deviceToken = SwiftRmKeychain.load("remarkableDeviceToken") else {
-            throw SwiftRmError.notRegistered
-        }
-        let userToken = try await renewUserToken(deviceToken: deviceToken)
-        
-        print(userToken)
+        let userToken = try await SwiftRmToken()
         
         let rootHash = try await getRootHash(userToken: userToken)
         
@@ -40,62 +35,26 @@ extension SwiftRmSession {
                 return rootHash
             },
             loadItems: {
-                            
-                            return try await loadItems(userToken: userToken)
-                        },
+                return try await loadItems(userToken: userToken)
+            },
+            fetchItem:  { entry in
+                return try await fetchItem(entry: entry, userToken: userToken)
+                        }
+            
             
         )
     }
     
     
-    private static func renewUserToken(deviceToken: String) async throws -> String {
-        let url = URL(string: RemarkableConfig.userTokenURL)!
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(deviceToken)", forHTTPHeaderField: "Authorization")
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let http = response as? HTTPURLResponse,
-              (200...299).contains(http.statusCode) else {
-            throw SwiftRmError.invalidResponse
-        }
-        
-        return String(data: data, encoding: .utf8) ?? ""
+    private static func fetchMetadata(hash: String, userToken: SwiftRmToken) async throws -> RmItem {
+        let item: RmItem = try await SwiftRmNetwork.request(RemarkableConfig.blobUrl + hash, userToken: userToken)
+        return item
     }
     
-    private static func fetchMetadata(hash: String, userToken: String) async throws -> RmItem {
-        var request = URLRequest(url: URL(string: RemarkableConfig.blobUrl + hash)!)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(userToken)", forHTTPHeaderField: "Authorization")
+    private static func fetchIndex(hash: String, userToken: SwiftRmToken) async throws -> [RmIndexEntry] {
         
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse,
-              (200...299).contains(http.statusCode) else {
-            throw SwiftRmError.invalidResponse
-        }
-        print("Successfully fetched metadata")
-      
+        let text: String = try await SwiftRmNetwork.requestText(RemarkableConfig.blobUrl + hash, userToken: userToken)
         
-        return try JSONDecoder().decode(RmItem.self, from: data)
-    }
-    
-    private static func fetchIndex(hash: String, userToken: String) async throws -> [RmIndexEntry] {
-        var request = URLRequest(url: URL(string: RemarkableConfig.blobUrl + hash)!)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(userToken)", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse,
-              (200...299).contains(http.statusCode) else {
-            throw SwiftRmError.invalidResponse
-        }
-
-        let text = String(data: data, encoding: .utf8) ?? ""
-        
-        print("Fetched")
-        print(text)
         let lines = text.split(separator: "\n").dropFirst()
         return lines.compactMap { line -> RmIndexEntry? in
             let parts = line.split(separator: ":")
@@ -108,7 +67,7 @@ extension SwiftRmSession {
         }
     }
     
-    private static func loadItems(userToken: String) async throws -> [RmItem] {
+    private static func loadItems(userToken: SwiftRmToken) async throws -> [RmItem] {
         let rootHash = try await getRootHash(userToken: userToken)
         let rootIndex = try await fetchIndex(hash: rootHash, userToken: userToken)
         
@@ -133,7 +92,7 @@ extension SwiftRmSession {
         }
     }
 
-    private static func fetchItem(entry: RmIndexEntry, userToken: String) async throws -> RmItem? {
+    private static func fetchItem(entry: RmIndexEntry, userToken: SwiftRmToken) async throws -> RmItem? {
         let subIndex = try await fetchIndex(hash: entry.hash, userToken: userToken)
         guard let metaFile = subIndex.first(where: { $0.filename.hasSuffix(".metadata") }) else {
             return nil
@@ -144,22 +103,12 @@ extension SwiftRmSession {
         return metadata
     }
     
-    private static func getRootHash(userToken: String) async throws -> String {
-        var request = URLRequest(url: URL(string: RemarkableConfig.rootGet)!)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(userToken)", forHTTPHeaderField: "Authorization")
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse,
-              (200...299).contains(http.statusCode) else {
-            throw SwiftRmError.invalidResponse
-        }
-        
-        let root = try JSONDecoder().decode(RmRoot.self, from: data)
+    private static func getRootHash(userToken: SwiftRmToken) async throws -> String {
+        let root: RmRoot = try await SwiftRmNetwork.request(RemarkableConfig.rootGet, userToken: userToken)
         return root.hash
     }
     
- 
+
 }
 
 
@@ -193,33 +142,7 @@ struct RemarkableConfig {
 
 extension SwiftRm {
     public static func registerDevice(token: String) async throws -> String {
-        let uuid = UUID().uuidString.lowercased()
-        let payload: [String: String] = [
-            "code": token,
-            "deviceDesc": RemarkableConfig.defaultDeviceDesc,
-            "deviceID": uuid
-        ]
-        let body = try JSONEncoder().encode(payload)
-        let url = URL(string: RemarkableConfig.deviceTokenURL)!
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.httpBody = body
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let http = response as? HTTPURLResponse,
-              (200...299).contains(http.statusCode) else {
-            throw SwiftRmError.invalidResponse
-        }
-        
-        let deviceToken = String(data: data, encoding: .utf8) ?? ""
-        
-        // Save to Keychain
-        SwiftRmKeychain.save("remarkableDeviceToken", deviceToken)
-        
-        return deviceToken
+        return try await SwiftRmNetwork.registerDevice(token: token)
     }
 }
 

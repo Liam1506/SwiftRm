@@ -12,6 +12,7 @@ public enum SwiftRmError: Error, LocalizedError {
     case notFound
     case unauthorized
     case notRegistered
+    case metaDataNotFound
     
     public var errorDescription: String? {
         switch self {
@@ -19,6 +20,7 @@ public enum SwiftRmError: Error, LocalizedError {
         case .notFound:        "The requested resource was not found"
         case .unauthorized:    "You are not authorized to perform this action"
         case .notRegistered:   "The device is not registerd"
+        case .metaDataNotFound:   "No Meta Data was found"
         }
     }
 }
