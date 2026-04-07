@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftData
+
 @MainActor
 class SwiftRmCache {
     private let container: ModelContainer
@@ -84,6 +85,7 @@ class SwiftRmCache {
                 cacheMap.removeValue(forKey: uuid)
                 
             } else {
+                Log.msg("Download new Item \(uuid)")
                 let newItem = try await saveNewItemByHash(index: indexItem)
                 syncedItems.append(newItem)
             }
@@ -134,6 +136,7 @@ class SwiftRmCache {
     
     func cleanUpCache(deadEntries: [RmEntry]) throws {
         for entry in deadEntries {
+            Log.msg("Delete: \(entry.uuid)")
             context.delete(entry)
         }
         try context.save()

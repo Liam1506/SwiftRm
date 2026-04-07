@@ -11,23 +11,24 @@ import Foundation
 @Observable
 @MainActor
 public class SwiftRmFileSystem{
+    public var loading = false
+    
     public let session: SwiftRmSession
     public let root =  RmFolder(hash: "", visibleName: "My files", parent: nil)
-    
     public let trash =  RmFolder(hash: "trash", visibleName: "Trash", parent: "")
-    
     public var items: [RmItem] = []
     
     init(session: SwiftRmSession) throws{
         self.session = session
         Task{
-            
-          try await loadFiles()
+            loading = true
+            try await loadFiles()
+            loading = false
         }
     }
     
     public func loadFiles() async throws {
-        self.items = try await SwiftRmCache(session: session).loadItems()//session.loadItems()
+        self.items = try await SwiftRmCache(session: session).loadItems()
     
         try await buildTree()
     }

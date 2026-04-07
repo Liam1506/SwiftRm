@@ -16,7 +16,7 @@ struct SwiftRmKeychain {
             kSecAttrAccount as String: key,
             kSecValueData as String: data
         ]
-        SecItemDelete(query as CFDictionary) // delete old value if exists
+        SecItemDelete(query as CFDictionary)
         SecItemAdd(query as CFDictionary, nil)
     }
     

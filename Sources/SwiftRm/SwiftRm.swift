@@ -5,11 +5,6 @@ import os
 
 @MainActor
 public class SwiftRm {
-    private static let logger = Logger(
-            subsystem: "com.yourname.MyLibrary",
-            category: "Networking"
-        )
-    
     private let session: SwiftRmSession
     public let fileSystem: SwiftRmFileSystem
 
@@ -37,7 +32,7 @@ public struct SwiftRmSession {
     public var fetchItem: (RmIndexEntry) async throws -> RmItem?
     
     public init(
-        fetchMetadata: @escaping (String) async throws -> RmItem,//[Item],
+        fetchMetadata: @escaping (String) async throws -> RmItem,
         fetchIndex: @escaping (String) async throws -> [RmIndexEntry],
         deleteSomething: @escaping (String) async throws -> Void,
         getRootHash: @escaping () async throws -> String,

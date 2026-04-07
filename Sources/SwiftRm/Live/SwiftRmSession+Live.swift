@@ -39,7 +39,7 @@ extension SwiftRmSession {
             },
             fetchItem:  { entry in
                 return try await fetchItem(entry: entry, userToken: userToken)
-                        }
+            }
             
             
         )
