@@ -1,6 +1,12 @@
+//
+//  SwiftRm+Cache.swift
+//  SwiftRm
+//
+//  Created by Liam Wittig on 07.04.26.
+//
+
 import Foundation
 import SwiftData
-
 @MainActor
 class SwiftRmCache {
     private let container: ModelContainer
@@ -12,8 +18,10 @@ class SwiftRmCache {
         if let container {
             self.container = container
         } else {
+            Log.msg("Creating container")
             self.container = try Self.makeContainer()
         }
+        
         
         self.context = self.container.mainContext
         self.session = session
@@ -44,6 +52,7 @@ class SwiftRmCache {
         let cachedHash = RmRootCache.getRootHashCache()
         
         if rootHash == cachedHash {
+            Log.msg("Cache is up to date")
             return mapEntriesToItems(entries: try load())
         }
         
@@ -66,6 +75,8 @@ class SwiftRmCache {
                 if cached.contentHash == indexItem.hash {
                     syncedItems.append(cached)
                 } else {
+                    
+                    Log.msg("Updating item \(uuid)")
                     let updated = try await updateItem(cached, with: indexItem)
                     syncedItems.append(updated)
                 }

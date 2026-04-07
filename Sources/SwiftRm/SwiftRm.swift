@@ -1,9 +1,15 @@
 // The Swift Programming Language
 // https://docs.swift.org/swift-book
 
+import os
 
 @MainActor
 public class SwiftRm {
+    private static let logger = Logger(
+            subsystem: "com.yourname.MyLibrary",
+            category: "Networking"
+        )
+    
     private let session: SwiftRmSession
     public let fileSystem: SwiftRmFileSystem
 
