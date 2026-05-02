@@ -23,4 +23,4 @@ The following features are currently implemented and functional:
 * **rmfakecloud Support:** Connect to a self-hosted [rmfakecloud](https://github.com/ddvk/rmfakecloud) instance via `RemarkableConfig.rmfakecloud(host:)`.
 
 ## Acknowledgements
-This project is inspired by [rmapi](https://github.com/juruen/rmapi) and the work done by the reMarkable community to document the cloud API.
+This project is inspired by [rmapi](https://github.com/ddvk/rmapi) and the work done by the reMarkable community to document the cloud API.
