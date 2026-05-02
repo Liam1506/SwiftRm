@@ -13,7 +13,8 @@ public enum SwiftRmError: Error, LocalizedError {
     case unauthorized
     case notRegistered
     case metaDataNotFound
-    
+    case generationConflict
+
     public var errorDescription: String? {
         switch self {
         case .invalidResponse: "The server returned an invalid response"
@@ -21,6 +22,7 @@ public enum SwiftRmError: Error, LocalizedError {
         case .unauthorized:    "You are not authorized to perform this action"
         case .notRegistered:   "The device is not registerd"
         case .metaDataNotFound:   "No Meta Data was found"
+        case .generationConflict: "Root generation conflict, please retry"
         }
     }
 }

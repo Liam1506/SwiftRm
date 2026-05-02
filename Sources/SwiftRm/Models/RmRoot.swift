@@ -11,5 +11,11 @@ import Foundation
 struct RmRoot: Codable {
     let hash: String
     let generation: Int
-    let schemaVersion: Int
+    let schemaVersion: Int?
+}
+
+struct RmRootPut: Codable {
+    let hash: String
+    let generation: Int
+    let broadcast: Bool
 }

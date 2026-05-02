@@ -1,15 +1,14 @@
 //
-//  File.swift
+//  RmIndexEntry.swift
 //  SwiftRm
-//
-//  Created by Liam Wittig on 07.04.26.
 //
 
 import Foundation
 
-
 public struct RmIndexEntry: Sendable {
     let hash: String
-    let filename: String  // e.g. "uuid.metadata", "uuid.content", "uuid/page.rm"
+    let type: String
+    let filename: String
+    let subfiles: Int
     let size: Int
 }

@@ -12,12 +12,14 @@ import Foundation
 @MainActor
 public class SwiftRmFileSystem{
     public var loading = false
-    
+    public var syncingCount = 0
+    public var syncing: Bool { syncingCount > 0 }
+
     public let session: SwiftRmSession
     public let root =  RmFolder(hash: "", visibleName: "My files", parent: nil)
     public let trash =  RmFolder(hash: "trash", visibleName: "Trash", parent: "")
     public var items: [RmItem] = []
-    
+
     init(session: SwiftRmSession) throws{
         self.session = session
         Task{
@@ -26,41 +28,158 @@ public class SwiftRmFileSystem{
             loading = false
         }
     }
-    
+
     public func loadFiles() async throws {
         self.items = try await SwiftRmCache(session: session).loadItems()
-    
         try await buildTree()
     }
-    
+
+    private func withSync(_ work: @escaping @Sendable () async throws -> Void) {
+        syncingCount += 1
+        Task {
+            defer { Task { @MainActor in syncingCount -= 1 } }
+            do { try await work() }
+            catch { Log.msg("sync operation failed: \(error)", level: .error) }
+        }
+    }
+
+    public func move(item: RmDocument, from source: RmFolder, to destination: RmFolder) {
+        source.documents.removeAll { $0.hash == item.hash }
+        destination.documents.append(item)
+        syncMove(hash: item.hash, to: destination.hash)
+    }
+
+    public func move(folder: RmFolder, from source: RmFolder, to destination: RmFolder) {
+        source.folders.removeAll { $0.hash == folder.hash }
+        destination.folders.append(folder)
+        syncMove(hash: folder.hash, to: destination.hash)
+    }
+
+    private func syncMove(hash: String, to destHash: String) {
+        withSync { [session] in
+            try await session.moveItem(hash, destHash)
+            await MainActor.run { RmRootCache.setRootHashCache(hash: "") }
+        }
+    }
+
+    public func trash(item: RmDocument, from source: RmFolder) {
+        move(item: item, from: source, to: trash)
+    }
+
+    public func trash(folder: RmFolder, from source: RmFolder) {
+        move(folder: folder, from: source, to: trash)
+    }
+
+    public func upload(name: String, data: Data, to parent: RmFolder) {
+        let placeholder = RmDocument(hash: UUID().uuidString.lowercased(), visibleName: name, parent: parent.hash, lastModified: String(Int64(Date().timeIntervalSince1970 * 1000)))
+        parent.documents.append(placeholder)
+
+        let parentHash = parent.hash
+        withSync { [session] in
+            try await session.uploadDocument(name, data, parentHash)
+            await MainActor.run { RmRootCache.setRootHashCache(hash: "") }
+        }
+    }
+
+    public func createFolder(name: String, in parent: RmFolder) {
+        let placeholder = RmFolder(hash: UUID().uuidString.lowercased(), visibleName: name, parent: parent.hash)
+        parent.folders.append(placeholder)
+
+        let parentHash = parent.hash
+        withSync { [session] in
+            try await session.createFolder(name, parentHash)
+            await MainActor.run { RmRootCache.setRootHashCache(hash: "") }
+        }
+    }
+
+    public func inspectDocument(_ doc: RmDocument) async throws -> [(name: String, content: String)] {
+        let (rootEntry, subIndex) = try await resolveDocument(doc)
+
+        var results: [(name: String, content: String)] = []
+        results.append((name: "root entry", content: "\(rootEntry.hash):\(rootEntry.type):\(rootEntry.filename):\(rootEntry.subfiles):\(rootEntry.size)"))
+
+        results.append((name: "sub-index", content: subIndex.map {
+            "\($0.hash):\($0.type):\($0.filename):\($0.subfiles):\($0.size)"
+        }.joined(separator: "\n")))
+
+        for entry in subIndex {
+            if entry.filename.hasSuffix(".metadata") || entry.filename.hasSuffix(".content") {
+                let raw = try await session.fetchBlobText(entry.hash)
+                results.append((name: entry.filename, content: raw))
+            }
+        }
+        return results
+    }
+
+    public func downloadPDF(_ doc: RmDocument) async throws -> Data {
+        let (_, subIndex) = try await resolveDocument(doc)
+        guard let pdfEntry = subIndex.first(where: { $0.filename.hasSuffix(".pdf") || $0.filename.hasSuffix(".epub") }) else {
+            throw SwiftRmError.notFound
+        }
+        return try await session.downloadBlob(pdfEntry.hash)
+    }
+
+    public func downloadNotebookPages(_ doc: RmDocument) async throws -> [RmFile] {
+        let (_, subIndex) = try await resolveDocument(doc)
+        let rmEntries = subIndex.filter { $0.filename.hasSuffix(".rm") }
+        return try await withThrowingTaskGroup(of: RmFile.self) { group in
+            for entry in rmEntries {
+                group.addTask { [session] in
+                    let data = try await session.downloadBlob(entry.hash)
+                    return try RmFileParser.parse(data)
+                }
+            }
+            var pages: [RmFile] = []
+            for try await page in group { pages.append(page) }
+            return pages
+        }
+    }
+
+    public func documentType(_ doc: RmDocument) async throws -> String {
+        let (_, subIndex) = try await resolveDocument(doc)
+        if subIndex.contains(where: { $0.filename.hasSuffix(".pdf") }) { return "pdf" }
+        if subIndex.contains(where: { $0.filename.hasSuffix(".epub") }) { return "epub" }
+        if subIndex.contains(where: { $0.filename.hasSuffix(".rm") }) { return "notebook" }
+        return "unknown"
+    }
+
+    private func resolveDocument(_ doc: RmDocument) async throws -> (RmIndexEntry, [RmIndexEntry]) {
+        let rootHash = try await session.getRootHash()
+        let rootIndex = try await session.fetchIndex(rootHash)
+        guard let rootEntry = rootIndex.first(where: { $0.filename == doc.hash }) else {
+            throw SwiftRmError.notFound
+        }
+        let subIndex = try await session.fetchIndex(rootEntry.hash)
+        return (rootEntry, subIndex)
+    }
+
     public func buildTree() async throws {
+        root.documents = []
+        root.folders = []
+        trash.documents = []
+        trash.folders = []
+
         var folderMap: [String: RmFolder] = [
               "": root,
               "trash": trash
           ]
-        
-        
+
         for item in items where item.isFolder {
             let folder = RmFolder(hash: item.hash ?? "", visibleName: item.visibleName, parent: item.parent)
             folderMap[item.hash ?? ""] = folder
         }
-        
+
         for item in items where item.isDocument {
             let doc = RmDocument(hash: item.hash ?? "", visibleName: item.visibleName, parent: item.parent, lastModified: item.lastModified)
             let parentFolder = folderMap[item.parent ?? ""] ?? root
             parentFolder.documents.append(doc)
         }
-        
+
         for folder in folderMap.values where folder.hash != "" {
             let parentFolder = folderMap[folder.parent ?? ""] ?? root
-            if(folder.hash != "trash"){
+            if folder.hash != "trash" {
                 parentFolder.folders.append(folder)
             }
         }
-        
     }
-    
 }
-
-
-
